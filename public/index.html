@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>File Server - UI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>File Server</h1>
+    <p>Sube, descarga, renombra y borra archivos. Responsive UI.</p>
+  </header>
+
+  <main>
+    <section class="upload">
+      <h2>Subir archivo</h2>
+      <form id="uploadForm">
+        <input type="file" id="fileInput" name="file" />
+        <button type="submit">Subir</button>
+      </form>
+      <div id="uploadMsg" class="msg"></div>
+    </section>
+
+    <section class="lists">
+      <div class="panel">
+        <h2>Archivos locales</h2>
+        <ul id="localList"></ul>
+      </div>
+      <div class="panel">
+        <h2>Archivos remotos</h2>
+        <ul id="remoteList"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Conecta dos servidores para ver archivos remotos. Edita REMOTE_SERVER en los servidores si es necesario.</small>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

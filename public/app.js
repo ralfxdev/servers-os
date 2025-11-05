@@ -44,20 +44,7 @@ async function loadLocal() {
   dlLink.setAttribute('download', '');
   li.appendChild(dlLink);
 
-  // If local video, add play button that uses /stream endpoint
-  const isLocalVideo = /\.(mp4|webm|ogg)$/i.test(f);
-  if (isLocalVideo) {
-    const playLocal = document.createElement('button');
-    playLocal.textContent = 'Ver vídeo';
-    playLocal.onclick = () => {
-      const modal = ensureVideoModal();
-      const video = modal.querySelector('video');
-      video.src = `/stream?name=${encodeURIComponent(f)}`;
-      modal.style.display = 'flex';
-      video.play().catch(() => {});
-    };
-    li.appendChild(playLocal);
-  }
+  // NOTE: 'Ver' button above already handles local images and videos; no extra play button needed
 
     const renameBtn = document.createElement('button');
     renameBtn.textContent = 'Renombrar';
@@ -156,7 +143,7 @@ async function loadRemote() {
 }
 
 // Modal player for remote videos
-function ensureVideoModal() {
+function ensureMediaModal() {
   if (document.getElementById('mediaModal')) return document.getElementById('mediaModal');
   const modal = document.createElement('div');
   modal.id = 'mediaModal';
@@ -201,16 +188,6 @@ function ensureVideoModal() {
   modal.appendChild(container);
   document.body.appendChild(modal);
   return modal;
-}
-
-function openRemoteVideo(name) {
-  const modal = ensureVideoModal();
-  const video = modal.querySelector('video');
-  // If the server is local, prefer /files/:name which supports ranges; for remote use proxy stream
-  const src = `/remote-proxy-stream?name=${encodeURIComponent(name)}`;
-  video.src = src;
-  modal.style.display = 'flex';
-  video.play().catch(() => {});
 }
 
 document.getElementById('uploadForm').addEventListener('submit', async (ev) => {

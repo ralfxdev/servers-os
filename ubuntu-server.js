@@ -142,6 +142,28 @@ app.get('/remote-proxy-download', async (req, res) => {
   }
 });
 
+// Remote proxy stream: forward Range header to allow streaming and seeking
+app.get('/remote-proxy-stream', async (req, res) => {
+  const name = req.query.name;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const remoteUrl = `${REMOTE_SERVER}/uploads/${encodeURIComponent(name)}`;
+    const headers = {};
+    if (req.headers.range) headers.Range = req.headers.range;
+    const r = await axios.get(remoteUrl, { responseType: 'stream', headers, timeout: 10000, validateStatus: null });
+    // Propagar status (200 or 206)
+    res.status(r.status);
+    // Propagar headers
+    if (r.headers['content-type']) res.setHeader('Content-Type', r.headers['content-type']);
+    if (r.headers['accept-ranges']) res.setHeader('Accept-Ranges', r.headers['accept-ranges']);
+    if (r.headers['content-range']) res.setHeader('Content-Range', r.headers['content-range']);
+    if (r.headers['content-length']) res.setHeader('Content-Length', r.headers['content-length']);
+    r.data.pipe(res);
+  } catch (err) {
+    res.status(502).json({ error: 'remote stream failed' });
+  }
+});
+
 // Subir archivo local (create)
 app.post('/upload', upload.any(), async (req, res) => {
   // multer.any() accepts files with any field name - helps avoid "Unexpected field"

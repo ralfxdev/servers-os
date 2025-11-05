@@ -48,4 +48,5 @@ app.get('/', async (req, res) => {
   `);
 });
 
-app.listen(8080, () => console.log('Servidor activo en puerto 8080'));
+app.listen(8080, '0.0.0.0', () => console.log('Servidor activo en puerto 8080'));
+

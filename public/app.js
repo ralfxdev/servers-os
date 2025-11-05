@@ -23,6 +23,21 @@ async function loadLocal() {
   dlLink.setAttribute('download', '');
   li.appendChild(dlLink);
 
+  // If local video, add play button that uses /stream endpoint
+  const isLocalVideo = /\.(mp4|webm|ogg)$/i.test(f);
+  if (isLocalVideo) {
+    const playLocal = document.createElement('button');
+    playLocal.textContent = 'Ver vídeo';
+    playLocal.onclick = () => {
+      const modal = ensureVideoModal();
+      const video = modal.querySelector('video');
+      video.src = `/stream?name=${encodeURIComponent(f)}`;
+      modal.style.display = 'flex';
+      video.play().catch(() => {});
+    };
+    li.appendChild(playLocal);
+  }
+
     const renameBtn = document.createElement('button');
     renameBtn.textContent = 'Renombrar';
     renameBtn.onclick = async () => {

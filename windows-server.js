@@ -104,6 +104,45 @@ app.get('/files/:name', (req, res) => {
   res.sendFile(filePath);
 });
 
+// Local stream with Range support for video playback and seeking
+app.get('/stream', (req, res) => {
+  const name = req.query.name && path.basename(req.query.name);
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const filePath = path.join(UPLOAD_DIR, name);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+  const contentType = require('mime').getType(filePath) || 'application/octet-stream';
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    if (start >= fileSize || end >= fileSize) {
+      res.status(416).setHeader('Content-Range', `bytes */${fileSize}`);
+      return res.end();
+    }
+    const chunksize = (end - start) + 1;
+    const file = fs.createReadStream(filePath, { start, end });
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': contentType,
+    });
+    file.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
+});
+
 // Proxy simple para listar archivos del servidor remoto (útil para la UI)
 app.get('/remote-proxy', async (req, res) => {
   try {

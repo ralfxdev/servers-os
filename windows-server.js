@@ -4,6 +4,7 @@ const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
 const os = require('os');
+const multerPkg = multer;
 
 const app = express();
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -64,6 +65,17 @@ app.get('/stats', (req, res) => {
   res.json(collectStats());
 });
 
+// Global error handler (catch Multer errors and others)
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err instanceof multerPkg.MulterError || (err && err.code && String(err.code).startsWith('LIMIT_'))) {
+    console.error('[MulterError]', err.code || err.message, err);
+    return res.status(400).json({ error: 'MulterError', code: err.code || 'MULTER_ERROR', message: err.message });
+  }
+  console.error('[error]', err && err.stack ? err.stack : err);
+  res.status(500).json({ error: 'server_error', message: err && err.message ? err.message : String(err) });
+});
+
 const REMOTE_SERVER = 'http://192.168.1.16:8080';
 
 app.use(express.json());
@@ -120,7 +132,8 @@ app.get('/remote-proxy-download', async (req, res) => {
 });
 
 // Subir archivo local (create)
-app.post('/upload', upload.array('files'), async (req, res) => {
+app.post('/upload', upload.any(), async (req, res) => {
+  // Accept any file field name to prevent Unexpected field errors
   const files = req.files || (req.file ? [req.file] : []);
   if (!files || !files.length) return res.status(400).json({ error: 'No files uploaded' });
 

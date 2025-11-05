@@ -4,6 +4,7 @@ const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
 const os = require('os');
+const multerPkg = multer; // alias to check types in error handler
 
 const app = express();
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -69,6 +70,19 @@ app.get('/stats', (req, res) => {
   res.json(collectStats());
 });
 
+// Global error handler (catch Multer errors and others)
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  // Multer errors
+  if (err instanceof multerPkg.MulterError || (err && err.code && String(err.code).startsWith('LIMIT_'))) {
+    console.error('[MulterError]', err.code || err.message, err);
+    return res.status(400).json({ error: 'MulterError', code: err.code || 'MULTER_ERROR', message: err.message });
+  }
+  // Generic
+  console.error('[error]', err && err.stack ? err.stack : err);
+  res.status(500).json({ error: 'server_error', message: err && err.message ? err.message : String(err) });
+});
+
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const REMOTE_SERVER = 'http://192.168.1.17:8080';
@@ -129,7 +143,8 @@ app.get('/remote-proxy-download', async (req, res) => {
 });
 
 // Subir archivo local (create)
-app.post('/upload', upload.array('files'), async (req, res) => {
+app.post('/upload', upload.any(), async (req, res) => {
+  // multer.any() accepts files with any field name - helps avoid "Unexpected field"
   const files = req.files || (req.file ? [req.file] : []);
   if (!files || !files.length) return res.status(400).json({ error: 'No files uploaded' });
 

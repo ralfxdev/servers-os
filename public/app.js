@@ -107,7 +107,12 @@ document.getElementById('uploadForm').addEventListener('submit', async (ev) => {
     input.value = '';
     loadLocal();
   } else {
-    document.getElementById('uploadMsg').textContent = 'Error al subir';
+    // Try to show JSON error from server (Multer or other)
+    let body = null;
+    try { body = await res.json(); } catch (e) { /* ignore */ }
+    const msg = body && (body.message || body.error || JSON.stringify(body)) ? (body.message || body.error || JSON.stringify(body)) : `Error ${res.status}`;
+    document.getElementById('uploadMsg').textContent = `Error al subir: ${msg}`;
+    console.error('Upload failed', res.status, body);
   }
 });
 

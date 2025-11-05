@@ -9,12 +9,33 @@ async function loadLocal() {
     const li = document.createElement('li');
     li.textContent = f;
 
-  const viewLink = document.createElement('a');
-  viewLink.href = `/uploads/${encodeURIComponent(f)}`;
-  viewLink.textContent = 'Ver';
-  viewLink.target = '_blank';
-  viewLink.className = 'btn-link';
-  li.appendChild(viewLink);
+  // Decide media type
+  const isVideoLocal = /\.(mp4|webm|ogg)$/i.test(f);
+  const isImageLocal = /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(f);
+
+  if (isVideoLocal || isImageLocal) {
+    const verBtn = document.createElement('button');
+    verBtn.textContent = 'Ver';
+    verBtn.onclick = () => {
+      const modal = ensureMediaModal();
+      const video = modal.querySelector('video');
+      const img = modal.querySelector('img');
+      if (isVideoLocal) {
+        img.style.display = 'none';
+        video.style.display = 'block';
+        video.src = `/stream?name=${encodeURIComponent(f)}`;
+        modal.style.display = 'flex';
+        video.play().catch(() => {});
+      } else {
+        video.pause(); video.src = '';
+        video.style.display = 'none';
+        img.style.display = 'block';
+        img.src = `/uploads/${encodeURIComponent(f)}`;
+        modal.style.display = 'flex';
+      }
+    };
+    li.appendChild(verBtn);
+  }
 
   const dlLink = document.createElement('a');
   dlLink.href = `/files/${encodeURIComponent(f)}?download=1`;
@@ -80,20 +101,36 @@ async function loadRemote() {
       files.forEach(f => {
         const li = document.createElement('li');
         const name = f.name || f;
-        const a = document.createElement('a');
-        a.href = f.url || f.path || '#';
-        a.textContent = name;
-        a.target = '_blank';
-        a.className = 'btn-link';
-        li.appendChild(a);
-
-        // If video type, add a player button that opens modal and streams via proxy
         const isVideo = /\.(mp4|webm|ogg)$/i.test(name);
-        if (isVideo) {
-          const play = document.createElement('button');
-          play.textContent = 'Ver vídeo';
-          play.onclick = () => openRemoteVideo(name);
-          li.appendChild(play);
+        const isImage = /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(name);
+
+        const title = document.createElement('span');
+        title.textContent = name;
+        title.className = 'btn-link';
+        li.appendChild(title);
+
+        if (isVideo || isImage) {
+          const ver = document.createElement('button');
+          ver.textContent = 'Ver';
+          ver.onclick = () => {
+            const modal = ensureMediaModal();
+            const video = modal.querySelector('video');
+            const img = modal.querySelector('img');
+            if (isVideo) {
+              img.style.display = 'none';
+              video.style.display = 'block';
+              video.src = `/remote-proxy-stream?name=${encodeURIComponent(name)}`;
+              modal.style.display = 'flex';
+              video.play().catch(() => {});
+            } else {
+              video.pause(); video.src = '';
+              video.style.display = 'none';
+              img.style.display = 'block';
+              img.src = f.url || `${REMOTE_SERVER}/uploads/${encodeURIComponent(name)}`;
+              modal.style.display = 'flex';
+            }
+          };
+          li.appendChild(ver);
         }
 
   const dl = document.createElement('a');
@@ -120,9 +157,9 @@ async function loadRemote() {
 
 // Modal player for remote videos
 function ensureVideoModal() {
-  if (document.getElementById('videoModal')) return document.getElementById('videoModal');
+  if (document.getElementById('mediaModal')) return document.getElementById('mediaModal');
   const modal = document.createElement('div');
-  modal.id = 'videoModal';
+  modal.id = 'mediaModal';
   modal.style.position = 'fixed';
   modal.style.left = '0';
   modal.style.top = '0';
@@ -145,13 +182,20 @@ function ensureVideoModal() {
   video.controls = true;
   video.style.maxWidth = '100%';
   video.style.maxHeight = '80vh';
+  video.style.display = 'none';
   container.appendChild(video);
+
+  const img = document.createElement('img');
+  img.style.maxWidth = '100%';
+  img.style.maxHeight = '80vh';
+  img.style.display = 'none';
+  container.appendChild(img);
 
   const close = document.createElement('button');
   close.textContent = 'Cerrar';
   close.style.display = 'block';
   close.style.marginTop = '8px';
-  close.onclick = () => { modal.style.display = 'none'; video.pause(); video.src = ''; };
+  close.onclick = () => { modal.style.display = 'none'; video.pause(); video.src = ''; img.src = ''; };
   container.appendChild(close);
 
   modal.appendChild(container);

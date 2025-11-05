@@ -98,11 +98,12 @@ document.getElementById('uploadForm').addEventListener('submit', async (ev) => {
   const input = document.getElementById('fileInput');
   if (!input.files.length) return;
   const fd = new FormData();
-  fd.append('file', input.files[0]);
+  for (let i = 0; i < input.files.length; i++) fd.append('files', input.files[i]);
   const res = await fetch('/upload', { method: 'POST', body: fd, headers: { 'Accept': 'application/json' } });
   if (res.ok) {
     const data = await res.json().catch(() => null);
-    document.getElementById('uploadMsg').textContent = data && data.filename ? `Subido: ${data.filename}` : 'Subido';
+    const names = data && data.files ? data.files.join(', ') : (data && data.filename ? data.filename : 'Subido');
+    document.getElementById('uploadMsg').textContent = `Subido: ${names}`;
     input.value = '';
     loadLocal();
   } else {

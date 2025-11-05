@@ -3,10 +3,71 @@ const multer = require('multer');
 const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
+const os = require('os');
 
 const app = express();
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const upload = multer({ dest: UPLOAD_DIR });
+
+// --- Concurrency & lock manager (inspirado en "comensales")
+const MAX_CONCURRENT_UPLOADS = 3; // semáforo: máximo de uploads simultáneos
+let currentUploads = 0;
+const nameLocks = new Set(); // nombres de archivo bloqueados
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Acquire locks for an array of names in a deterministic order to avoid deadlocks
+async function acquireLocks(names) {
+  const uniq = Array.from(new Set(names.map(n => String(n))));
+  uniq.sort();
+  while (true) {
+    // wait until none of the names are locked
+    const conflict = uniq.some(n => nameLocks.has(n));
+    if (!conflict) {
+      uniq.forEach(n => nameLocks.add(n));
+      console.log(`[locks] acquired: [${uniq.join(', ')}] (locks=${nameLocks.size})`);
+      // return a release function
+      return () => {
+        uniq.forEach(n => nameLocks.delete(n));
+        console.log(`[locks] released: [${uniq.join(', ')}] (locks=${nameLocks.size})`);
+      };
+    }
+    await sleep(50);
+  }
+}
+
+async function acquireUploadSlot() {
+  while (currentUploads >= MAX_CONCURRENT_UPLOADS) {
+    await sleep(50);
+  }
+  currentUploads++;
+  console.log(`[semaphore] slot acquired (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`);
+  return () => { currentUploads--; console.log(`[semaphore] slot released (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`); };
+}
+
+// Monitor / logger: imprime estado periódicamente y expone /stats
+function collectStats() {
+  const mem = process.memoryUsage();
+  return {
+    uptime: process.uptime(),
+    currentUploads,
+    locks: Array.from(nameLocks),
+    locksCount: nameLocks.size,
+    filesStored: (() => { try { return fs.readdirSync(UPLOAD_DIR).length } catch (e) { return null } })(),
+    memory: { rss: mem.rss, heapTotal: mem.heapTotal, heapUsed: mem.heapUsed },
+    load: os.loadavg ? os.loadavg() : null,
+    platform: process.platform
+  };
+}
+
+setInterval(() => {
+  const s = collectStats();
+  console.log('[stats]', JSON.stringify({ uptime: Math.round(s.uptime), currentUploads: s.currentUploads, locks: s.locksCount, files: s.filesStored, memMB: Math.round(s.memory.heapUsed/1024/1024) }));
+}, 5000);
+
+app.get('/stats', (req, res) => {
+  res.json(collectStats());
+});
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -68,23 +129,44 @@ app.get('/remote-proxy-download', async (req, res) => {
 });
 
 // Subir archivo local (create)
-app.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const safeName = path.basename(req.file.originalname);
-  let dest = path.join(UPLOAD_DIR, safeName);
-  if (fs.existsSync(dest)) {
-    // evitar sobrescribir: prefijar timestamp
-    const suffix = Date.now();
-    dest = path.join(UPLOAD_DIR, `${suffix}-${safeName}`);
-  }
-  fs.renameSync(req.file.path, dest);
+app.post('/upload', upload.array('files'), async (req, res) => {
+  const files = req.files || (req.file ? [req.file] : []);
+  if (!files || !files.length) return res.status(400).json({ error: 'No files uploaded' });
 
-  // Si el cliente espera JSON (fetch), devolver JSON
-  if (req.headers.accept && req.headers.accept.includes('application/json')) {
-    return res.json({ ok: true, filename: path.basename(dest) });
+  // Map to target names (preserve originalname)
+  const targets = files.map(f => path.basename(f.originalname || f.filename || f.path || 'file'));
+
+  // Acquire a slot (semaphore) to limit concurrent upload workers
+  const releaseSlot = await acquireUploadSlot();
+
+  // Acquire locks for the target names (deterministic order) to avoid deadlock
+  const releaseLocks = await acquireLocks(targets);
+
+  try {
+    const uploaded = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const safeName = path.basename(f.originalname || f.filename || `file-${Date.now()}`);
+      let dest = path.join(UPLOAD_DIR, safeName);
+      if (fs.existsSync(dest)) {
+        const suffix = Date.now();
+        dest = path.join(UPLOAD_DIR, `${suffix}-${safeName}`);
+      }
+      fs.renameSync(f.path, dest);
+      uploaded.push(path.basename(dest));
+    }
+
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json({ ok: true, files: uploaded });
+    }
+    res.redirect('/');
+  } catch (err) {
+    console.error('upload error', err);
+    res.status(500).json({ error: 'upload failed' });
+  } finally {
+    releaseLocks();
+    releaseSlot();
   }
-  // por defecto redirect para formularios tradicionales
-  res.redirect('/');
 });
 
 // Renombrar/actualizar archivo (update)

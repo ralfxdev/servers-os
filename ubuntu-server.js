@@ -32,6 +32,10 @@ app.get('/files/:name', (req, res) => {
   const name = path.basename(req.params.name);
   const filePath = path.join(UPLOAD_DIR, name);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No encontrado' });
+  // Si se solicita descarga forzada, enviar como attachment
+  if (req.query && ('download' in req.query)) {
+    return res.download(filePath, name);
+  }
   res.sendFile(filePath);
 });
 
@@ -44,6 +48,22 @@ app.get('/remote-proxy', async (req, res) => {
     res.json(list);
   } catch (err) {
     res.status(502).json({ error: 'remote not available' });
+  }
+});
+
+// Proxy de descarga para archivos remotos: reenvía el stream y fuerza Content-Disposition: attachment
+app.get('/remote-proxy-download', async (req, res) => {
+  const name = req.query.name;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const remoteUrl = `${REMOTE_SERVER}/uploads/${encodeURIComponent(name)}`;
+    const r = await axios.get(remoteUrl, { responseType: 'stream', timeout: 10000 });
+    // Propagar tipo si existe
+    if (r.headers['content-type']) res.setHeader('Content-Type', r.headers['content-type']);
+  res.setHeader('Content-Disposition', `attachment; filename="${path.basename(name)}"`);
+    r.data.pipe(res);
+  } catch (err) {
+    res.status(502).json({ error: 'remote download failed' });
   }
 });
 

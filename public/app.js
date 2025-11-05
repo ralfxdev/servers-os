@@ -9,11 +9,19 @@ async function loadLocal() {
     const li = document.createElement('li');
     li.textContent = f;
 
-    const link = document.createElement('a');
-    link.href = `/uploads/${encodeURIComponent(f)}`;
-    link.textContent = ' ⬇';
-    link.target = '_blank';
-    li.appendChild(link);
+  const viewLink = document.createElement('a');
+  viewLink.href = `/uploads/${encodeURIComponent(f)}`;
+  viewLink.textContent = 'Ver';
+  viewLink.target = '_blank';
+  viewLink.className = 'btn-link';
+  li.appendChild(viewLink);
+
+  const dlLink = document.createElement('a');
+  dlLink.href = `/files/${encodeURIComponent(f)}?download=1`;
+  dlLink.textContent = 'Descargar';
+  dlLink.className = 'btn-link';
+  dlLink.setAttribute('download', '');
+  li.appendChild(dlLink);
 
     const renameBtn = document.createElement('button');
     renameBtn.textContent = 'Renombrar';
@@ -60,7 +68,17 @@ async function loadRemote() {
         a.href = f.url || f.path || '#';
         a.textContent = f.name || f;
         a.target = '_blank';
+        a.className = 'btn-link';
         li.appendChild(a);
+
+        const dl = document.createElement('a');
+        // use proxy-download to force download
+        dl.href = `/remote-proxy-download?name=${encodeURIComponent(f.name || f)}`;
+        dl.textContent = 'Descargar';
+        dl.className = 'btn-link';
+        dl.setAttribute('download', '');
+        li.appendChild(dl);
+
         ul.appendChild(li);
       });
       return;

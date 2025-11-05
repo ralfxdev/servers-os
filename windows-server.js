@@ -12,7 +12,7 @@ const upload = multer({ dest: UPLOAD_DIR });
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// --- Concurrency & lock manager (inspirado en "comensales")
+// --- Concurrency & lock manager (inspired by the Dining Philosophers)
 const MAX_CONCURRENT_UPLOADS = 3;
 let currentUploads = 0;
 const nameLocks = new Set();
@@ -100,17 +100,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(UPLOAD_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Listar archivos locales
+// List local files
 app.get('/files', (req, res) => {
   try {
     const files = fs.readdirSync(UPLOAD_DIR);
     res.json(files);
   } catch (err) {
-    res.status(500).json({ error: 'No se pudo listar archivos' });
+    res.status(500).json({ error: 'Could not list files' });
   }
 });
 
-// Descargar/leer archivo
+// Download/read file
 app.get('/files/:name', (req, res) => {
   const name = path.basename(req.params.name);
   const filePath = path.join(UPLOAD_DIR, name);
@@ -160,7 +160,7 @@ app.get('/stream', (req, res) => {
   }
 });
 
-// Proxy simple para listar archivos del servidor remoto (útil para la UI)
+// Simple proxy to list files from a remote server (useful for the UI)
 app.get('/remote-proxy', async (req, res) => {
   try {
     const r = await axios.get(`${REMOTE_SERVER}/files`, { timeout: 3000 });
@@ -172,7 +172,7 @@ app.get('/remote-proxy', async (req, res) => {
   }
 });
 
-// Proxy de descarga para archivos remotos
+// Remote download proxy
 app.get('/remote-proxy-download', async (req, res) => {
   const name = req.query.name;
   if (!name) return res.status(400).json({ error: 'name is required' });
@@ -207,7 +207,7 @@ app.get('/remote-proxy-stream', async (req, res) => {
   }
 });
 
-// Subir archivo local (create)
+// Upload local file (create)
 app.post('/upload', upload.any(), async (req, res) => {
   // Accept any file field name to prevent Unexpected field errors
   const files = req.files || (req.file ? [req.file] : []);
@@ -244,7 +244,7 @@ app.post('/upload', upload.any(), async (req, res) => {
   }
 });
 
-// Renombrar/actualizar archivo (update)
+// Rename/update file (update)
 app.put('/files/:name', (req, res) => {
   const oldName = path.basename(req.params.name);
   const newName = req.body.newName || req.query.newName;
@@ -256,7 +256,7 @@ app.put('/files/:name', (req, res) => {
   res.json({ ok: true, filename: path.basename(newPath) });
 });
 
-// Borrar archivo (delete)
+// Delete file (delete)
 app.delete('/files/:name', (req, res) => {
   const name = path.basename(req.params.name);
   const filePath = path.join(UPLOAD_DIR, name);
@@ -265,7 +265,7 @@ app.delete('/files/:name', (req, res) => {
   res.json({ ok: true });
 });
 
-// Root: sirve la interfaz en public/index.html
+// Root: serve the interface at public/index.html
 app.get('/', async (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

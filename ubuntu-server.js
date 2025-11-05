@@ -4,16 +4,16 @@ const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
 const os = require('os');
-const multerPkg = multer; // alias to check types in error handler
+const multerPkg = multer;
 
 const app = express();
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const upload = multer({ dest: UPLOAD_DIR });
 
-// --- Concurrency & lock manager (inspirado en "comensales")
-const MAX_CONCURRENT_UPLOADS = 3; // semáforo: máximo de uploads simultáneos
+// --- Concurrency & lock manager (Simulating the Dining Philosophers algorithm)
+const MAX_CONCURRENT_UPLOADS = 3; // semaphore: maximum simultaneous uploads
 let currentUploads = 0;
-const nameLocks = new Set(); // nombres de archivo bloqueados
+const nameLocks = new Set(); // locked file names
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -56,7 +56,7 @@ async function acquireUploadSlot() {
   return () => { currentUploads--; logEvent(`[semaphore] slot released (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`); };
 }
 
-// Monitor / logger: imprime estado periódicamente y expone /stats
+// Monitor / logger: prints status periodically and exposes /stats
 function collectStats() {
   const mem = process.memoryUsage();
   return {
@@ -111,22 +111,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(UPLOAD_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Listar archivos locales
+// List local files
 app.get('/files', (req, res) => {
   try {
     const files = fs.readdirSync(UPLOAD_DIR);
     res.json(files);
   } catch (err) {
-    res.status(500).json({ error: 'No se pudo listar archivos' });
+    res.status(500).json({ error: 'Could not list files' });
   }
 });
 
-// Descargar/leer archivo
+// Download/read file
 app.get('/files/:name', (req, res) => {
   const name = path.basename(req.params.name);
   const filePath = path.join(UPLOAD_DIR, name);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No encontrado' });
-  // Si se solicita descarga forzada, enviar como attachment
+  // If forced download is requested, send as attachment
   if (req.query && ('download' in req.query)) {
     return res.download(filePath, name);
   }
@@ -172,7 +172,7 @@ app.get('/stream', (req, res) => {
   }
 });
 
-// Proxy simple para listar archivos del servidor remoto (útil para la UI)
+// Simple proxy to list files from a remote server (useful for the UI)
 app.get('/remote-proxy', async (req, res) => {
   try {
     const r = await axios.get(`${REMOTE_SERVER}/files`, { timeout: 3000 });
@@ -184,7 +184,7 @@ app.get('/remote-proxy', async (req, res) => {
   }
 });
 
-// Proxy de descarga para archivos remotos: reenvía el stream y fuerza Content-Disposition: attachment
+// Remote download proxy: forwards the stream and forces Content-Disposition: attachment
 app.get('/remote-proxy-download', async (req, res) => {
   const name = req.query.name;
   if (!name) return res.status(400).json({ error: 'name is required' });
@@ -222,7 +222,7 @@ app.get('/remote-proxy-stream', async (req, res) => {
   }
 });
 
-// Subir archivo local (create)
+// Upload local file (create)
 app.post('/upload', upload.any(), async (req, res) => {
   // multer.any() accepts files with any field name - helps avoid "Unexpected field"
   const files = req.files || (req.file ? [req.file] : []);
@@ -264,7 +264,7 @@ app.post('/upload', upload.any(), async (req, res) => {
   }
 });
 
-// Renombrar/actualizar archivo (update)
+// Rename/update file (update)
 app.put('/files/:name', (req, res) => {
   const oldName = path.basename(req.params.name);
   const newName = req.body.newName || req.query.newName;
@@ -276,7 +276,7 @@ app.put('/files/:name', (req, res) => {
   res.json({ ok: true, filename: path.basename(newPath) });
 });
 
-// Borrar archivo (delete)
+// Delete file (delete)
 app.delete('/files/:name', (req, res) => {
   const name = path.basename(req.params.name);
   const filePath = path.join(UPLOAD_DIR, name);
@@ -285,7 +285,7 @@ app.delete('/files/:name', (req, res) => {
   res.json({ ok: true });
 });
 
-// Root: sirve la interfaz en public/index.html
+// Root: serve the interface at public/index.html
 app.get('/', async (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

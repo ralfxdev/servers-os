@@ -1,4 +1,4 @@
-const REMOTE_SERVER = window.REMOTE_SERVER || null; // optional: server exposes remote constant
+const REMOTE_SERVER = window.REMOTE_SERVER || null;
 
 async function loadLocal() {
   const res = await fetch('/files');
@@ -44,8 +44,6 @@ async function loadLocal() {
   dlLink.setAttribute('download', '');
   li.appendChild(dlLink);
 
-  // NOTE: 'Ver' button above already handles local images and videos; no extra play button needed
-
     const renameBtn = document.createElement('button');
     renameBtn.textContent = 'Renombrar';
     renameBtn.onclick = async () => {
@@ -78,10 +76,7 @@ async function loadLocal() {
 async function loadRemote() {
   const ul = document.getElementById('remoteList');
   ul.innerHTML = '';
-  // El servidor remoto está configurado en los archivos del servidor; aquí sólo intentamos una llamada a la misma IP-base si existe
   try {
-    // infer remote from current page origin? if not available, try known host via relative config
-    // Try to fetch using a relative host; the server exposes a REMOTE_SERVER variable when needed
     const resp = await fetch('/remote-proxy', { method: 'GET' });
     if (resp.ok) {
       const files = await resp.json();
@@ -136,10 +131,8 @@ async function loadRemote() {
     // continue to try direct remote server if configured
   }
 
-  // fallback: no proxy available — try to fetch using a REMOTE_SERVER host guessed from server code
-  // Because the server code includes a REMOTE_SERVER constant, the easiest integration is to rely on the / files endpoint from the other server manually.
   const hint = null; // not available in the client by default
-  ul.innerHTML = '<li>❌ No disponible (la UI usa un proxy opcional /remote-proxy). Si quieres ver archivos remotos, consulta la otra instancia en su IP.</li>';
+  ul.innerHTML = '<li>❌ No disponible.</li>';
 }
 
 // Modal player for remote videos
@@ -204,7 +197,6 @@ document.getElementById('uploadForm').addEventListener('submit', async (ev) => {
     input.value = '';
     loadLocal();
   } else {
-    // Try to show JSON error from server (Multer or other)
     let body = null;
     try { body = await res.json(); } catch (e) { /* ignore */ }
     const msg = body && (body.message || body.error || JSON.stringify(body)) ? (body.message || body.error || JSON.stringify(body)) : `Error ${res.status}`;
@@ -213,6 +205,6 @@ document.getElementById('uploadForm').addEventListener('submit', async (ev) => {
   }
 });
 
-// Inicializar
+// Initialize
 loadLocal();
 loadRemote();

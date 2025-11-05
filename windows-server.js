@@ -19,6 +19,15 @@ const nameLocks = new Set();
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// In-memory recent events buffer for dashboard
+const recentEvents = [];
+function logEvent(msg) {
+  const ts = new Date().toISOString();
+  recentEvents.unshift(`${ts} ${msg}`);
+  if (recentEvents.length > 50) recentEvents.pop();
+  console.log(msg);
+}
+
 async function acquireLocks(names) {
   const uniq = Array.from(new Set(names.map(n => String(n))));
   uniq.sort();
@@ -26,8 +35,8 @@ async function acquireLocks(names) {
     const conflict = uniq.some(n => nameLocks.has(n));
     if (!conflict) {
       uniq.forEach(n => nameLocks.add(n));
-      console.log(`[locks] acquired: [${uniq.join(', ')}] (locks=${nameLocks.size})`);
-      return () => { uniq.forEach(n => nameLocks.delete(n)); console.log(`[locks] released: [${uniq.join(', ')}] (locks=${nameLocks.size})`); };
+      logEvent(`[locks] acquired: [${uniq.join(', ')}] (locks=${nameLocks.size})`);
+      return () => { uniq.forEach(n => nameLocks.delete(n)); logEvent(`[locks] released: [${uniq.join(', ')}] (locks=${nameLocks.size})`); };
     }
     await sleep(50);
   }
@@ -38,8 +47,8 @@ async function acquireUploadSlot() {
     await sleep(50);
   }
   currentUploads++;
-  console.log(`[semaphore] slot acquired (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`);
-  return () => { currentUploads--; console.log(`[semaphore] slot released (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`); };
+  logEvent(`[semaphore] slot acquired (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`);
+  return () => { currentUploads--; logEvent(`[semaphore] slot released (current=${currentUploads}/${MAX_CONCURRENT_UPLOADS})`); };
 }
 
 function collectStats() {
@@ -56,10 +65,18 @@ function collectStats() {
   };
 }
 
-setInterval(() => {
+function renderDashboard() {
   const s = collectStats();
-  console.log('[stats]', JSON.stringify({ uptime: Math.round(s.uptime), currentUploads: s.currentUploads, locks: s.locksCount, files: s.filesStored, memMB: Math.round(s.memory.heapUsed/1024/1024) }));
-}, 5000);
+  process.stdout.write('\x1Bc');
+  console.log('=== Chapin Drive — Resource Monitor ===');
+  console.log(`Uptime: ${Math.round(s.uptime)}s   Uploads: ${s.currentUploads}/${MAX_CONCURRENT_UPLOADS}   Locks: ${s.locksCount}   Files: ${s.filesStored}   Mem(MB): ${Math.round(s.memory.heapUsed/1024/1024)}`);
+  if (s.load) console.log('Load avg (1/5/15):', s.load.map(n => n.toFixed(2)).join(' '));
+  console.log('Recent events:');
+  recentEvents.slice(0, 12).forEach(e => console.log('  ' + e));
+  console.log('\nPress Ctrl+C to exit.');
+}
+
+setInterval(renderDashboard, 1000);
 
 app.get('/stats', (req, res) => {
   res.json(collectStats());
@@ -253,4 +270,4 @@ app.get('/', async (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(8080, '0.0.0.0', () => console.log('Servidor activo en puerto 8080'));
+app.listen(8080, '0.0.0.0', () => logEvent('Servidor activo en puerto 8080'));

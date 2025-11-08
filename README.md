@@ -2,7 +2,7 @@
 
 Documentación completa — servers-os
 
-Servidor(s) de ejemplo en Node.js que exponen una API REST para gestionar archivos locales (CRUD), sirven una interfaz web responsiva en `public/`, soportan streaming de vídeo (Range), subida múltiple con control de concurrencia y ofrecen endpoints proxy para acceder a archivos de un servidor remoto.
+Servidores en Node.js que exponen una API REST para gestionar archivos locales (CRUD), sirven una interfaz web responsiva en `public/`, soportan streaming de vídeo (Range), subida múltiple con control de concurrencia y ofrecen endpoints proxy para acceder a archivos de un servidor remoto.
 
 Contenido del repositorio
 - `ubuntu-server.js` — servidor principal: endpoints CRUD, streaming (`/stream`), proxy remoto (`/remote-proxy`, `/remote-proxy-download`, `/remote-proxy-stream`), subida (`/upload`) y monitor (`/stats`).
@@ -105,7 +105,7 @@ sequenceDiagram
 	Server->>Server: acquireUploadSlot() (semaphore)
 	Server->>Server: acquireLocks(sorted(unique(names)))
 	Server->>FS: move temp files -> uploads/<name>
-	Server->>Server: releaseLocks(); releaseUploadSlot()
+	Server->>Server: releaseLocks(releaseUploadSlot());
 	Server-->>Client: 200 JSON {ok:true, files:[...]}
 ```
 
